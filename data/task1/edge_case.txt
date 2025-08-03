@@ -1,0 +1,22 @@
+class DataProcessor:
+    def process_data(self):
+        sql = """
+        CREATE PROCEDURE calculate_metrics
+        AS
+        BEGIN
+            SELECT AVG(value) as avg_value
+            FROM metrics
+            GROUP BY category;
+        END;
+        """
+        
+        js_code = """
+        function updateMetrics(data) {
+            data.forEach(item => {
+                if(!item.value) return;
+                calculations.push(item.value * 2);
+            });
+        }
+        """
+        
+        return sql, js_code

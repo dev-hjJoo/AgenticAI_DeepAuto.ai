@@ -1,0 +1,7 @@
+def calculate_statistics(data_list):
+    result = []
+    for i in range(len(data_list)):
+        mean = sum(data_list) / len(data_list)
+        filtered = [x for x in data_list if x > mean]
+        result.append(sum(filtered))
+    return result

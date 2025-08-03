@@ -1,6 +1,7 @@
 import streamlit as st
 import sys
 import os
+from api_client import ApiClient
 
 # PAGE LAYOUT
 title = "Automated Code Review and Enhancement"
@@ -18,7 +19,7 @@ def _changeFileName(file_name):
 
     return file_name
 
-def _loadTestCase(dir):
+def _loadTestCase(task_type):
     ''' _loadTestCase
         I: Test Case 문서가 저장된 폴더 경로 (String)
         O: 경로 내 포함된 txt 파일들의 이름과 내용이 담긴 딕셔너리 (DICT<파일명: 본문 내용>)
@@ -39,10 +40,12 @@ def _loadTestCase(dir):
 
 # Variables
 repo_dir = os.getcwd()
-dir = repo_dir+"/fe/data/task1" 
+dir = repo_dir+"/fe/data/task1"
 examples = _loadTestCase(dir)
 examples['자유 작성'] = ''
 
+api = ApiClient()
+test = api.getData('connect')
 
 # UI
 input_area, output_area = st.columns(2)

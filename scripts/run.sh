@@ -2,4 +2,4 @@
 
 cd `dirname $0`/..
 
-streamlit run ./front/main.py
+streamlit run ./fe/main.py

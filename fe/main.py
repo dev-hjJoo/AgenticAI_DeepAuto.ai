@@ -1,7 +1,6 @@
 import streamlit as st
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # PAGE LAYOUT
 title = "Automated Code Review and Enhancement"
@@ -39,7 +38,8 @@ def _loadTestCase(dir):
 
 
 # Variables
-dir = "./data/task1"
+repo_dir = os.getcwd()
+dir = repo_dir+"/fe/data/task1" 
 examples = _loadTestCase(dir)
 examples['자유 작성'] = ''
 

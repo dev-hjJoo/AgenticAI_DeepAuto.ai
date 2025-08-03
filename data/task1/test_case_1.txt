@@ -1,0 +1,10 @@
+def process_user_input(user_data):
+    # SQL 인젝션 취약점 포함
+    query = f"SELECT * FROM users WHERE id = {user_data['id']}"
+    
+    # 버퍼 오버플로우 위험 포함
+    buffer = [0] * 10
+    for i in range(len(user_data['items'])):  # 경계 검사 없음
+        buffer[i] = user_data['items'][i]
+    
+    return query, buffer

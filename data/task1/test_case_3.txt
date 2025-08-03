@@ -1,0 +1,16 @@
+class UserAuthentication:
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+    
+    def validate_credentials(self):
+        if len(self.password) < 8:
+            return False
+        if not any(c.isupper() for c in self.password):
+            return False
+        return True
+    
+    def generate_token(self):
+        if self.validate_credentials():
+            return f"token_{self.username}_{len(self.password)}"
+        return None

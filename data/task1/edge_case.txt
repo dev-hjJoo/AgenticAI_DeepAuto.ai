@@ -1,0 +1,25 @@
+# Python 코드와 내장된 SQL 및 JavaScript
+class DataProcessor:
+    def process_data(self):
+        # SQL 저장 프로시저
+        sql = """
+        CREATE PROCEDURE calculate_metrics
+        AS
+        BEGIN
+            SELECT AVG(value) as avg_value
+            FROM metrics
+            GROUP BY category;
+        END;
+        """
+        
+        # 프론트엔드용 내장 JavaScript
+        js_code = """
+        function updateMetrics(data) {
+            data.forEach(item => {
+                if(!item.value) return;
+                calculations.push(item.value * 2);
+            });
+        }
+        """
+        
+        return sql, js_code

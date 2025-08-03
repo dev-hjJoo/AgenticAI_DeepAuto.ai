@@ -1,28 +1,59 @@
 import streamlit as st
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # PAGE LAYOUT
 title = "Automated Code Review and Enhancement"
 st.set_page_config(page_title=title, layout="wide")
 st.title(title)
 
+# Functions
+def _changeFileName(file_name):
+    file_name = file_name.removesuffix(".txt")
+    file_name = ' '.join([piece.capitalize() for piece in file_name.split('_')])
+
+    return file_name
+
+def _loadTestCase(dir):
+    '''loadTestCase
+        I: Test Case 문서가 저장된 폴더 경로 (String)
+        O: DICT<파일명: 본문 내용>
+    '''
+    examples =dict()
+    if os.path.exists(dir):
+        txt_files = [fn for fn in os.listdir(dir) if fn.endswith('.txt')]
+        if len(txt_files) > 0:
+            for file_name in sorted(txt_files):
+                file_path = os.path.join(dir, file_name)
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+
+                    examples[_changeFileName(file_name)] = content
+    
+    return examples
+
+
+
+
 # Variables
-test_case = {
-    'Test Case 1': 'test case 1',
-    'Test Case 2': 'test case 2',
-    'Test Case 3': 'test case 3',
-    }
-test_case['자유 작성'] = ''
+dir = "./data/task1"
+examples = _loadTestCase(dir)
+examples['자유 작성'] = ''
 
 # UI
 input_area, output_area = st.columns(2)
 with input_area:
     selected = st.selectbox(
         label="Test Case",
-        options=test_case.keys(),
-        index=None
+        options=examples.keys(),
+        index=len(examples)-1,
     )
-    st.text_area(label='Enter Python code to review...', 
-                 value=test_case[selected] if selected else '')
+    st.text_area(
+        label='Enter Python code to review...', 
+        value=examples[selected] if selected else '',
+        height='content'
+    )
 
     _, btn_col = st.columns([4, 1])
     btn_col.button('Submit', type='primary', use_container_width=True)

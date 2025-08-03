@@ -10,15 +10,19 @@ st.title(title)
 
 # Functions
 def _changeFileName(file_name):
+    ''' _changeFileName
+    I: snake 표기법으로 작성된 파일명 (String) -> 예: test_case_1.txt
+    O: 첫 글자 대문자 및 띄워쓰기로 작성된 파일명 (String) -> 예: Test Case 1
+    '''
     file_name = file_name.removesuffix(".txt")
     file_name = ' '.join([piece.capitalize() for piece in file_name.split('_')])
 
     return file_name
 
 def _loadTestCase(dir):
-    '''loadTestCase
+    ''' _loadTestCase
         I: Test Case 문서가 저장된 폴더 경로 (String)
-        O: DICT<파일명: 본문 내용>
+        O: 경로 내 포함된 txt 파일들의 이름과 내용이 담긴 딕셔너리 (DICT<파일명: 본문 내용>)
     '''
     examples =dict()
     if os.path.exists(dir):
@@ -34,12 +38,11 @@ def _loadTestCase(dir):
     return examples
 
 
-
-
 # Variables
 dir = "./data/task1"
 examples = _loadTestCase(dir)
 examples['자유 작성'] = ''
+
 
 # UI
 input_area, output_area = st.columns(2)

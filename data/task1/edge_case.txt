@@ -1,7 +1,5 @@
-# Python 코드와 내장된 SQL 및 JavaScript
 class DataProcessor:
     def process_data(self):
-        # SQL 저장 프로시저
         sql = """
         CREATE PROCEDURE calculate_metrics
         AS
@@ -12,7 +10,6 @@ class DataProcessor:
         END;
         """
         
-        # 프론트엔드용 내장 JavaScript
         js_code = """
         function updateMetrics(data) {
             data.forEach(item => {

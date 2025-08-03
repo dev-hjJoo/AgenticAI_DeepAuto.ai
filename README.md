@@ -11,5 +11,5 @@ $ scripts/install.sh
 
 ## Running
 ```
-$ scripts/run.sh
+$ scripts/start.sh
 ```

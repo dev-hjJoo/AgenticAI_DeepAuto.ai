@@ -50,10 +50,8 @@ def _onSubmit(query: str):
     api = ApiClient()
     response = api.post('code', data={"query": query})
     result = response['result']
-    data = json.loads(result[len('```json'): -len('```')].strip())
+    print('[FE] result:', result) # LOG (TODO: 작업 완료 후 제거)
 
-    print(data)
-    print(type(data))
     print('-'*100)
     print()
 

@@ -28,6 +28,9 @@ def _loadTestCase(task_type: str):
         I: Test Case 문서가 저장된 폴더 경로 (String)
         O: 경로 내 포함된 txt 파일들의 이름과 내용이 담긴 딕셔너리 (DICT<파일명: 본문 내용>)
     '''
+    repo_dir = os.getcwd()
+    dir = repo_dir+"/fe/data/"+task_type
+
     examples =dict()
     if os.path.exists(dir):
         txt_files = [fn for fn in os.listdir(dir) if fn.endswith('.txt')]
@@ -49,19 +52,13 @@ def _onSubmit(query: str):
     '''
     api = ApiClient()
     response = api.post('code', data={"query": query})
-    result = response['result']
-    print('[FE] result:', result) # LOG (TODO: 작업 완료 후 제거)
+    st.session_state['code_review'] = response['result']
 
-    print('-'*100)
-    print()
-
-
-
-# Variables
-repo_dir = os.getcwd()
-dir = repo_dir+"/fe/data/task1"
-examples = _loadTestCase(dir)
+# Variables & Logic
+examples = _loadTestCase('task1')
 examples['자유 작성'] = ''
+if not st.session_state.get('code_review', False):
+    st.session_state['code_review'] = {}
 
 
 # UI
@@ -88,32 +85,42 @@ with input_area:
 
 with output_area.container(border=True):
     st.header('Report')
+    msg_before_click = "To check the report, enter the code and click the 'Submit' button."
+    
+    st.subheader('🎯 Issues')
+    if st.session_state['code_review'].get('issues', False) and len(st.session_state['code_review']['issues']) > 0:
+        issues = st.session_state['code_review']['issues']
+        for issue in issues:
+            with st.expander(issue['title'], icon='🚨' if issue['severity']=='CRITICAL' else '⚠️'):
+                st.caption(issue['summary'])
 
-    st.subheader('🚨 Bugs & Security Issues')
-    with st.expander("Contains SQL injection vulnerability"):
-        code = '''query = f"SELECT * FROM users WHERE id = {user_data['id']}"'''
-        st.code(code)
-    with st.expander("Contains buffer overflow risk"):
-        code = '''buffer = [0] * 10
-    for i in range(len(user_data['items'])):  # No bounds checking
-        buffer[i] = user_data['items'][i]'''
-        st.code(code)
+                if issue['issue_type'] == 'Bugs':
+                    issue_type = ":violet-badge[:material/bug_report: Bugs]"
+                elif issue['issue_type'] == 'Security Issue':
+                    issue_type = ":orange-badge[:material/security: Security Issues]"
+                else:
+                    issue_type = ":blue-badge[:material/swap_driving_apps_wheel: Performance Problem]"
 
-    st.subheader('⚠️ Performance Problems')
-    with st.expander("Inefficient list operations"):
-        code = '''result = []'''
-        st.code(code)
-    with st.expander("Repeated calculations"):
-        code = '''mean = sum(data_list) / len(data_list)'''
-        st.code(code)
-    with st.expander("Unnecessary list creation"):
-        code = '''filtered = [x for x in data_list if x > mean]'''
-        st.code(code)
+                code_line_number = f'Line {issue['start_line']}-{issue['end_line']}' if issue['start_line'] != issue['end_line'] else f'Line {issue['start_line']}'
+                st.markdown(issue_type+' '+code_line_number)
+                
+                st.code('\n'.join(issue['code_snippet']))
+    else:
+        with st.container(border=True):
+            st.caption(msg_before_click)
 
     st.subheader('✏️ Refactored Code Suggestion')
-    refactored_code = '''리팩토링한 코드'''
-    st.code(refactored_code, language='python')
+    if st.session_state['code_review'].get('refactored_code', False):
+        refactored_code = '''리팩토링한 코드'''
+        st.code(refactored_code, language='python')
+    else:
+        with st.container(border=True):
+            st.caption(msg_before_click)
 
     st.subheader('⚒️ Unit Test Generation')
-    refactored_code = '''유닛 테스트 코드'''
-    st.code(refactored_code, language='python')
+    if st.session_state['code_review'].get('unit_code', False):
+        refactored_code = '''유닛 테스트 코드'''
+        st.code(refactored_code, language='python')
+    else:
+        with st.container(border=True):
+            st.caption(msg_before_click)

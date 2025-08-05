@@ -1,7 +1,9 @@
-import streamlit as st
 import sys
 import os
+import json
+import streamlit as st
 from api_client import ApiClient
+
 
 # PAGE LAYOUT
 title = "Automated Code Review and Enhancement"
@@ -9,8 +11,9 @@ st.set_page_config(page_title=title, layout="wide")
 st.title(title)
 
 # Functions
-def _changeFileName(file_name):
+def _changeFileName(file_name: str):
     ''' _changeFileName
+    Snake 표기법으로 작성된 텍스트 파일(.txt)의 이름을 사람이 읽기 좋은 형태로 변환해주는 함수
     I: snake 표기법으로 작성된 파일명 (String) -> 예: test_case_1.txt
     O: 첫 글자 대문자 및 띄워쓰기로 작성된 파일명 (String) -> 예: Test Case 1
     '''
@@ -19,8 +22,9 @@ def _changeFileName(file_name):
 
     return file_name
 
-def _loadTestCase(task_type):
+def _loadTestCase(task_type: str):
     ''' _loadTestCase
+        Task 별로 Test Case 파일들의 이름과 내용을 반환해주는 함수
         I: Test Case 문서가 저장된 폴더 경로 (String)
         O: 경로 내 포함된 txt 파일들의 이름과 내용이 담긴 딕셔너리 (DICT<파일명: 본문 내용>)
     '''
@@ -37,6 +41,23 @@ def _loadTestCase(task_type):
     
     return examples
 
+def _onSubmit(query: str):
+    ''' _onSubmit
+        사용자 입력이 주어졌을 때 WAS 서버로 POST 요청을 수행
+        I: Test Case 문서가 저장된 폴더 경로 (String)
+        O: 경로 내 포함된 txt 파일들의 이름과 내용이 담긴 딕셔너리 (DICT<파일명: 본문 내용>)
+    '''
+    api = ApiClient()
+    response = api.post('code', data={"query": query})
+    result = response['result']
+    data = json.loads(result[len('```json'): -len('```')].strip())
+
+    print(data)
+    print(type(data))
+    print('-'*100)
+    print()
+
+
 
 # Variables
 repo_dir = os.getcwd()
@@ -44,8 +65,6 @@ dir = repo_dir+"/fe/data/task1"
 examples = _loadTestCase(dir)
 examples['자유 작성'] = ''
 
-api = ApiClient()
-test = api.getData('connect')
 
 # UI
 input_area, output_area = st.columns(2)
@@ -55,14 +74,19 @@ with input_area:
         options=examples.keys(),
         index=len(examples)-1,
     )
-    st.text_area(
+    query = st.text_area(
         label='Enter Python code to review...', 
         value=examples[selected] if selected else '',
         height='content'
     )
 
     _, btn_col = st.columns([4, 1])
-    btn_col.button('Submit', type='primary', use_container_width=True)
+    btn_col.button('Submit', 
+                   on_click=_onSubmit, 
+                   args=(query,),
+                   disabled=(not query),
+                   type='primary', 
+                   use_container_width=True)
 
 with output_area.container(border=True):
     st.header('Report')

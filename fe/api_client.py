@@ -2,6 +2,8 @@ import sys
 import requests
 from utils.decorators import singleton
 
+
+# API 호출 클래스
 @singleton
 class ApiClient:
     def __init__(self):
@@ -10,12 +12,23 @@ class ApiClient:
             index = sys.argv.index("--be_port") + 1
             self.port = sys.argv[index]
     
-    def getData(self, endpoint: str, params=None):
+    def get(self, endpoint: str, params=None):
         if not self.port: return False
         url = self.base_url + self.port + '/' + endpoint
         response = requests.get(url, params=params)
 
         return response.json()
+    
+    def post(self, endpoint: str, data: dict):
+        url = self.base_url + self.port + '/' + endpoint
+        response = requests.post(url, json=data)
+        try:
+            return response.json()
+        except requests.exceptions.JSONDecodeError:
+            print(f"[JSONDecodeError] The response is not of JSON type. \nResponse: {response.text}")
+            raise
+        
+
 
         
         

@@ -37,10 +37,12 @@ class CodeReviewGraph:
 
         # Add Nodes
         builder.add_node("extract_code_issues", extract_code_issues)
+        builder.add_node("suggest_code_improvements", suggest_code_improvements)
 
         # Add Edges
         builder.add_edge(START, "extract_code_issues")
-        builder.add_edge("extract_code_issues", END)
+        builder.add_edge("extract_code_issues", "suggest_code_improvements")
+        builder.add_edge("suggest_code_improvements", END)
 
         # Compile
         self.graph = builder.compile()
@@ -109,7 +111,43 @@ def extract_code_issues(state: CodeReviewState) -> CodeReviewState:
     return {"issues": issues}
 
 def suggest_code_improvements(state: CodeReviewState) -> CodeReviewState:
-    pass
+    template = """
+    You are given a Python code snippet under the field user_code, and a list of detected issues under the field issues.
+    Each issue includes:
+    - "title": a short and concise summary of the issue (e.g., "Contains SQL injection vulnerability")
+    - "summary": A concise description (in English) of the issue found (string).
+    - "issue_type": One of the following values: Bugs, Security Issue, Performance Problem
+    - "severity": One of the following values: CRITICAL, WARNING.
+    - "start_line": The start line number of the problematic code block (integer).
+    - "end_line": The end line number (inclusive) of the problematic code block (integer).
+    - "code_snippet": A list of strings representing each line of the problematic code (i.e., multiline snippet).
+
+    Your task is to:
+
+    Generate a fixed version of the code that eliminates all issues listed.
+    Preserve the overall logic and structure of the code as much as possible.
+    For every modified line, append a Python comment containing the corresponding issue title (e.g., # Fixed: Potential index out of range error).
+
+    Do not include any explanation or extra output—only return the full corrected Python code with inline comments.
+
+    [user_code]
+    {user_code}
+
+    [issues]
+    {issues}
+    """
+
+    prompt = ChatPromptTemplate.from_template(template)
+
+    rag_chain = (
+        RunnablePassthrough()
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+    output = rag_chain.invoke({"user_code": state['user_code'], 'issues': state['issues']})
+
+    return {'refactored_code': output}
 
 def generate_unit_tests(state: CodeReviewState) -> CodeReviewState:
     pass

@@ -111,7 +111,7 @@ with output_area.container(border=True):
 
     st.subheader('✏️ Refactored Code Suggestion')
     if st.session_state['code_review'].get('refactored_code', False):
-        refactored_code = '''리팩토링한 코드'''
+        refactored_code = st.session_state['code_review']['refactored_code']
         st.code(refactored_code, language='python')
     else:
         with st.container(border=True):

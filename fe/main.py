@@ -85,10 +85,9 @@ with input_area:
 
 with output_area.container(border=True):
     st.header('Report')
-    msg_before_click = "To check the report, enter the code and click the 'Submit' button."
     
-    st.subheader('🎯 Issues')
     if st.session_state['code_review'].get('issues', False) and len(st.session_state['code_review']['issues']) > 0:
+        st.subheader('🎯 Issues')
         issues = st.session_state['code_review']['issues']
         for issue in issues:
             with st.expander(issue['title'], icon='🚨' if issue['severity']=='CRITICAL' else '⚠️'):
@@ -107,20 +106,18 @@ with output_area.container(border=True):
                 st.code('\n'.join(issue['code_snippet']))
     else:
         with st.container(border=True):
+            msg_before_click = "To check the report, enter the code and click the 'Submit' button."
             st.caption(msg_before_click)
 
-    st.subheader('✏️ Refactored Code Suggestion')
+    
     if st.session_state['code_review'].get('refactored_code', False):
+        st.subheader('✏️ Refactored Code Suggestion')
         refactored_code = st.session_state['code_review']['refactored_code']
         st.code(refactored_code, language='python')
-    else:
-        with st.container(border=True):
-            st.caption(msg_before_click)
+    
 
-    st.subheader('⚒️ Unit Test Generation')
     if st.session_state['code_review'].get('unit_code', False):
-        refactored_code = '''유닛 테스트 코드'''
-        st.code(refactored_code, language='python')
-    else:
-        with st.container(border=True):
-            st.caption(msg_before_click)
+        st.subheader('⚒️ Unit Test Generation')
+        unit_test_code = st.session_state['code_review']['unit_code']
+        st.code(unit_test_code, language='python')
+    

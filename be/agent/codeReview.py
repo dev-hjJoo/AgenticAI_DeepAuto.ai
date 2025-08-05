@@ -38,11 +38,13 @@ class CodeReviewGraph:
         # Add Nodes
         builder.add_node("extract_code_issues", extract_code_issues)
         builder.add_node("suggest_code_improvements", suggest_code_improvements)
+        builder.add_node("generate_unit_tests", generate_unit_tests)
 
         # Add Edges
         builder.add_edge(START, "extract_code_issues")
         builder.add_edge("extract_code_issues", "suggest_code_improvements")
-        builder.add_edge("suggest_code_improvements", END)
+        builder.add_edge("suggest_code_improvements", "generate_unit_tests")
+        builder.add_edge("generate_unit_tests", END)
 
         # Compile
         self.graph = builder.compile()
@@ -150,7 +152,52 @@ def suggest_code_improvements(state: CodeReviewState) -> CodeReviewState:
     return {'refactored_code': output}
 
 def generate_unit_tests(state: CodeReviewState) -> CodeReviewState:
-    pass
+    template = '''
+    You are given a Python code snippet under the field code. Your task is to:
+
+    1. Generate unittest-style test cases for the given code using Python's built-in unittest module.
+    2. Ensure all methods and branches in the given code are tested thoroughly.
+    3. Include both positive and negative test cases that demonstrate expected and failing behaviors.
+    4. The test code should:
+    - Import the target class or functions if needed.
+    - Use the unittest.TestCase class structure.
+    - Include meaningful test method names and assertions.
+    5. Do not include any explanation—output only the full Python test code.
+
+    Example Output:
+    class UserAuthentication:
+        def __init__(self, username, password):
+            self.username = username
+            self.password = password
+        
+        def validate_credentials(self):
+            if len(self.password) < 8:
+                return False
+            if not any(c.isupper() for c in self.password):
+                return False
+            return True
+        
+        def generate_token(self):
+            if self.validate_credentials():
+                return f"token_{{self.username}}_{{len(self.password)}}"
+            return None
+    
+    Input:
+    {code}
+    '''
+
+    prompt = ChatPromptTemplate.from_template(template)
+
+    rag_chain = (
+        RunnablePassthrough()
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+    output = rag_chain.invoke({"code": state['refactored_code']})
+
+
+    return {'unit_code': output}
         
         
 

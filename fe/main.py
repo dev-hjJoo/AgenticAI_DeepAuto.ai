@@ -85,6 +85,16 @@ with input_area:
 
 with output_area.container(border=True):
     st.header('Report')
+    if st.session_state['code_review'].get('issues', False) and st.session_state['code_review'].get('refactoring_issues', False):
+        cnt_iss = len(st.session_state['code_review']['issues'])
+        cnt_rf_iss = len(st.session_state['code_review']['refactoring_issues'])
+        col1, col2 = st.columns(2)
+        col1.metric(label='User Code', 
+                  value=cnt_iss)
+        col2.metric(label='Refactored Code', 
+                  value=cnt_rf_iss, 
+                  delta=cnt_iss-cnt_rf_iss)
+        pass
     
     if st.session_state['code_review'].get('issues', False) and len(st.session_state['code_review']['issues']) > 0:
         st.subheader('🎯 Issues')

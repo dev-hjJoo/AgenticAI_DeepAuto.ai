@@ -1,6 +1,6 @@
 import json
 from dotenv import load_dotenv
-from typing import TypedDict
+from typing import TypedDict, Literal
 from langgraph.graph import StateGraph, START, END
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnablePassthrough
@@ -28,6 +28,7 @@ class CodeReviewState(TypedDict):
     user_code: str
     issues: CodeIssue
     refactored_code: str
+    refactoring_issues: CodeIssue
     unit_code: str
 
 
@@ -42,12 +43,30 @@ class CodeReviewGraph:
 
         # Add Edges
         builder.add_edge(START, "extract_code_issues")
-        builder.add_edge("extract_code_issues", "suggest_code_improvements")
-        builder.add_edge("suggest_code_improvements", "generate_unit_tests")
+        builder.add_conditional_edges(
+            "extract_code_issues",
+            self._decide_next_step,
+            {
+                "suggest_code_improvements": "suggest_code_improvements",
+                "generate_unit_tests": "generate_unit_tests"
+            }
+        )
+        builder.add_edge("suggest_code_improvements", "extract_code_issues")
         builder.add_edge("generate_unit_tests", END)
 
         # Compile
         self.graph = builder.compile()
+
+        # Save Graph Image
+        image_bytes = self.graph.get_graph().draw_mermaid_png()
+        with open("docs/graph_output.png", "wb") as f:
+            f.write(image_bytes)
+    
+    def _decide_next_step(self, state: CodeReviewState) -> Literal["suggest_code_improvements", "generate_unit_tests"]:
+        if not state.get('refactored_code', False):
+            return "suggest_code_improvements"  
+        else:
+            return "generate_unit_tests"
 
     def invoke(self, query):
         initial_state = {'user_code': query}
@@ -106,11 +125,23 @@ def extract_code_issues(state: CodeReviewState) -> CodeReviewState:
         | llm
         | StrOutputParser()
     )
-    output = rag_chain.invoke(state['user_code'])
-    issues = json.loads(output[len('```json'): -len('```')].strip())
+    if not state.get('issues', False):
+        output = rag_chain.invoke(state['user_code'])
+        issues = json.loads(output[len('```json'): -len('```')].strip())
 
-    # Update states
-    return {"issues": issues}
+        # Update states
+        return {"issues": issues}
+
+    if state.get('refactored_code', False) and not state.get('refactoring_issues', False):
+        output = rag_chain.invoke(state['refactored_code'])
+        issues = json.loads(output[len('```json'): -len('```')].strip())
+
+        # Update states
+        return {"refactoring_issues": issues}
+
+    
+
+    
 
 def suggest_code_improvements(state: CodeReviewState) -> CodeReviewState:
     template = """

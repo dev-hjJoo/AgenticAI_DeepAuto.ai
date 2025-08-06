@@ -95,6 +95,7 @@ with output_area.container(border=True):
         
         with cnt_issues_area.container(border=True):
             # 이슈 개수
+            st.markdown('🔖 **Number of bugs and issues** included in the code')
             cnt_iss = len(st.session_state['code_review']['issues'])
             cnt_rf_iss = len(st.session_state['code_review']['refactoring_issues'])
 
@@ -107,6 +108,7 @@ with output_area.container(border=True):
         
         with pylint_score_area.container(border=True):
             # pylint 점수
+            st.markdown('🔖 **PyLint Score**')
             pylint_score = st.session_state['code_review']['pylint_score']
             rf_pylint_score = st.session_state['code_review']['refactoring_pylint_score']
 

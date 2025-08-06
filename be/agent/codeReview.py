@@ -160,24 +160,19 @@ def extract_code_issues(state: CodeReviewState) -> CodeReviewState:
         | StrOutputParser()
     )
     if not state.get('issues', False):
-        print('== EXTRACT CODE ISSUES ==')
         static_analysis = _analyze_code(state['user_code'])
-        print('[LOG][BE] STATIC ANALYSIS:', static_analysis)
         
         output = rag_chain.invoke({"code": state['user_code'], 'static_analysis': static_analysis})
 
         # 결과 후처리
         result = _remove_markdown_code_tag(output)
-        print('********\nresult:', result)
         result = json.loads(result)
 
         # Update states
         return {"issues": result['issues'], "pylint_score": result['pylint_score']}
 
     if state.get('refactoring_code', False) and not state.get('refactoring_issues', False):
-        print('== EXTRACT REFACTORING CODE ISSUES ==')
         static_analysis = _analyze_code(state['refactoring_code'])
-        print('[LOG][BE] STATIC ANALYSIS:', static_analysis)
 
         output = rag_chain.invoke({"code": state['refactoring_code'], 'static_analysis': static_analysis})
         

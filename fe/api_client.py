@@ -24,8 +24,8 @@ class ApiClient:
         response = requests.post(url, json=data)
         try:
             return response.json()
-        except requests.exceptions.JSONDecodeError:
-            print(f"[JSONDecodeError] The response is not of JSON type. \nResponse: {response.text}")
+        except Exception as e:
+            print(f"[JSONDecodeError] {e} The response is not of JSON type. \nResponse: {response.text}")
             raise
         
 

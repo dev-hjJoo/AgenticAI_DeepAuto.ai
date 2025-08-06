@@ -63,6 +63,8 @@ if not st.session_state.get('code_review', False):
 
 # UI
 input_area, output_area = st.columns(2)
+
+# 1. 사용자 입력 영역
 with input_area:
     selected = st.selectbox(
         label="Test Case",
@@ -83,15 +85,48 @@ with input_area:
                    type='primary', 
                    use_container_width=True)
 
+# 2. 결과 출력 영역
 with output_area.container(border=True):
     st.header('Report')
+
+    # Metrics
+    if st.session_state['code_review'].get('issues', False) and st.session_state['code_review'].get('refactoring_issues', False):
+        cnt_issues_area, pylint_score_area = st.columns(2)
+        
+        with cnt_issues_area.container(border=True):
+            # 이슈 개수
+            st.markdown('🔖 **Number of bugs and issues** included in the code')
+            cnt_iss = len(st.session_state['code_review']['issues'])
+            cnt_rf_iss = len(st.session_state['code_review']['refactoring_issues'])
+
+            col1, col2 = st.columns(2)
+            col1.metric(label='User Code', 
+                    value=cnt_iss)
+            col2.metric(label='Refactored Code', 
+                    value=cnt_rf_iss, 
+                    delta=cnt_iss-cnt_rf_iss)
+        
+        with pylint_score_area.container(border=True):
+            # pylint 점수
+            st.markdown('🔖 **PyLint Score**')
+            pylint_score = st.session_state['code_review']['pylint_score']
+            rf_pylint_score = st.session_state['code_review']['refactoring_pylint_score']
+
+            col1, col2 = st.columns(2)
+            col1.metric(label='User Code', 
+                    value=pylint_score)
+            col2.metric(label='Refactored Code', 
+                    value=rf_pylint_score, 
+                    delta=rf_pylint_score-pylint_score)
+        
     
+    # Issues
     if st.session_state['code_review'].get('issues', False) and len(st.session_state['code_review']['issues']) > 0:
         st.subheader('🎯 Issues')
         issues = st.session_state['code_review']['issues']
         for issue in issues:
             with st.expander(issue['title'], icon='🚨' if issue['severity']=='CRITICAL' else '⚠️'):
-                st.caption(issue['summary'])
+                st.caption(issue['description'])
 
                 if issue['issue_type'] == 'Bugs':
                     issue_type = ":violet-badge[:material/bug_report: Bugs]"
@@ -110,12 +145,14 @@ with output_area.container(border=True):
             st.caption(msg_before_click)
 
     
-    if st.session_state['code_review'].get('refactored_code', False):
+    # Refactoring Code
+    if st.session_state['code_review'].get('refactoring_code', False):
         st.subheader('✏️ Refactored Code Suggestion')
-        refactored_code = st.session_state['code_review']['refactored_code']
-        st.code(refactored_code, language='python')
+        refactoring_code = st.session_state['code_review']['refactoring_code']
+        st.code(refactoring_code, language='python')
     
 
+    # Unit code
     if st.session_state['code_review'].get('unit_code', False):
         st.subheader('⚒️ Unit Test Generation')
         unit_test_code = st.session_state['code_review']['unit_code']

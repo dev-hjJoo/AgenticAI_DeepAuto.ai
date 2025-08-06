@@ -6,6 +6,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+import subprocess
+import tempfile
+import os
 
 ''' 
 ====================
@@ -16,7 +19,7 @@ from langchain_core.output_parsers import StrOutputParser
 # TODO: Pydantic 이용해서 데이터 유효성 검사 로직 추가
 class CodeIssue(TypedDict):
     title: str
-    summary: str
+    description: str
     issue_type: str
     severity: str
     start_line: int
@@ -26,9 +29,11 @@ class CodeIssue(TypedDict):
 # State schema
 class CodeReviewState(TypedDict):
     user_code: str
+    refactoring_code: str
     issues: CodeIssue
-    refactored_code: str
     refactoring_issues: CodeIssue
+    pylint_score: str
+    refactoring_pylint_score: str
     unit_code: str
 
 
@@ -63,7 +68,7 @@ class CodeReviewGraph:
             f.write(image_bytes)
     
     def _decide_next_step(self, state: CodeReviewState) -> Literal["suggest_code_improvements", "generate_unit_tests"]:
-        if not state.get('refactored_code', False):
+        if not state.get('refactoring_code', False):
             return "suggest_code_improvements"  
         else:
             return "generate_unit_tests"
@@ -103,41 +108,89 @@ def extract_code_issues(state: CodeReviewState) -> CodeReviewState:
     Focus only on meaningful and important issues (not style or general improvements), but be thorough and list **as many such issues as possible** throughout the entire code.
     For each issue, return a JSON object with the following fields:
 
+    - "pylint_score": Extract and include the overall pylint_score if it exists in the static analysis report.
+        - Your code has been rated at `pytlint_score`/10
     - "title": a short and concise summary of the issue (e.g., "Contains SQL injection vulnerability")
-    - "summary": A concise description (in English) of the issue found (string).
+    - "description": A concise description (in English) of the issue found (string).
     - "issue_type": One of the following values: Bugs, Security Issue, Performance Problem
     - "severity": One of the following values: CRITICAL, WARNING.
+        - For Pylint issues: Use "WARNING" if the code type starts with `C` or `I`. Otherwise, use "CRITICAL".
+        - For Bandit issues: Always use "CRITICAL".
     - "start_line": The start line number of the problematic code block (integer).
     - "end_line": The end line number (inclusive) of the problematic code block (integer).
     - "code_snippet": A list of strings representing each line of the problematic code (i.e., multiline snippet).
+        - You must ensure the snippet content and line numbers exactly match the original code** — validate both the content and the position against the provided source code.
 
-    Do not include any explanation.
+    Your output must follow this format (strict JSON only, no markdown or explanation):
     If there are no issues, return an empty JSON array: []
     
-    Now, analyze the following Python code:
+    Here is the code to analyze:
+
     {code}
+
+    And here is the static analysis result:
+
+    {static_analysis}
+
+    ---
+    Return your result as a JSON array containing all detected issues.
+    ```json
+    {{
+    "pylint_score": float or null,
+    "issues": [
+        {{
+        "title": string,              // Short summary, e.g., "Possible SQL injection"
+        "description": string,        // Description of the issue (in English)
+        "issue_type": "Bugs" | "Security Issue" | "Performance Problem",
+        "severity": "CRITICAL" | "WARNING",  // See rules below
+        "start_line": integer,        // Line number where issue starts
+        "end_line": integer,          // Line number where issue ends (inclusive)
+        "code_snippet": [...]         // List of code lines, must match the original source exactly
+        }},
+        ...
+    ]
+    }}
     """
     prompt = ChatPromptTemplate.from_template(template)
 
     rag_chain = (
-        {'code': RunnablePassthrough()}
+        RunnablePassthrough()
         | prompt
         | llm
         | StrOutputParser()
     )
     if not state.get('issues', False):
-        output = rag_chain.invoke(state['user_code'])
-        issues = json.loads(output[len('```json'): -len('```')].strip())
+        print('== EXTRACT CODE ISSUES ==')
+        static_analysis = _analyze_code(state['user_code'])
+        print('[LOG][BE] STATIC ANALYSIS:', static_analysis)
+        
+        output = rag_chain.invoke({"code": state['user_code'], 'static_analysis': static_analysis})
+
+        # 결과 후처리
+        if output.strip().startswith("```json"):
+            output = output[len('```json'):]
+        if output.strip().endswith("```"):
+            output = output[:-len('```')]
+        result = json.loads(output.strip())
 
         # Update states
-        return {"issues": issues}
+        return {"issues": result['issues'], "pylint_score": result['pylint_score']}
 
-    if state.get('refactored_code', False) and not state.get('refactoring_issues', False):
-        output = rag_chain.invoke(state['refactored_code'])
-        issues = json.loads(output[len('```json'): -len('```')].strip())
+    if state.get('refactoring_code', False) and not state.get('refactoring_issues', False):
+        print('== EXTRACT REFACTORING CODE ISSUES ==')
+        static_analysis = _analyze_code(state['refactoring_code'])
+        print('[LOG][BE] STATIC ANALYSIS:', static_analysis)
 
+        output = rag_chain.invoke({"code": state['refactoring_code'], 'static_analysis': static_analysis})
+
+        # 결과 후처리
+        if output.strip().startswith("```json"):
+            output = output[len('```json'):]
+        if output.strip().endswith("```"):
+            output = output[:-len('```')]
+        result = json.loads(output.strip())
         # Update states
-        return {"refactoring_issues": issues}
+        return {"refactoring_issues": result['issues'], "refactoring_pylint_score": result['pylint_score']}
 
     
 
@@ -148,7 +201,7 @@ def suggest_code_improvements(state: CodeReviewState) -> CodeReviewState:
     You are given a Python code snippet under the field user_code, and a list of detected issues under the field issues.
     Each issue includes:
     - "title": a short and concise summary of the issue (e.g., "Contains SQL injection vulnerability")
-    - "summary": A concise description (in English) of the issue found (string).
+    - "description": A concise description (in English) of the issue found (string).
     - "issue_type": One of the following values: Bugs, Security Issue, Performance Problem
     - "severity": One of the following values: CRITICAL, WARNING.
     - "start_line": The start line number of the problematic code block (integer).
@@ -179,8 +232,13 @@ def suggest_code_improvements(state: CodeReviewState) -> CodeReviewState:
         | StrOutputParser()
     )
     output = rag_chain.invoke({"user_code": state['user_code'], 'issues': state['issues']})
+    result = output.strip()
+    if result.startswith("```python"):
+            result = result[len('```python'):]
+    if result.endswith("```"):
+        result = result[:-len('```')]
 
-    return {'refactored_code': output}
+    return {'refactoring_code': result.strip()}
 
 def generate_unit_tests(state: CodeReviewState) -> CodeReviewState:
     template = '''
@@ -225,12 +283,71 @@ def generate_unit_tests(state: CodeReviewState) -> CodeReviewState:
         | llm
         | StrOutputParser()
     )
-    output = rag_chain.invoke({"code": state['refactored_code']})
+    output = rag_chain.invoke({"code": state['refactoring_code']})
 
 
     return {'unit_code': output}
         
         
 
+''' 
+====================
+      FUNCTION
+====================
+'''
 
-    
+def _analyze_code(code_str: str) -> dict:
+    ''' _analyze_code
+        주어진 Python 코드 문자열을 임시 파일에 저장한 후, Pylint, Flake8, Bandit, MyPy를 실행하여 결과 반환
+        I: 문자열 형식의 파이썬 코드 (String)
+        O: 정적 도구(pylint, flake8, bandit, mypy) 별 분석 결과가 담긴 딕셔너리 (DICT<도구명(String): 분석 결과(String)>)
+    '''
+    """"""
+    results = {}
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".py", mode='w') as tmp:
+        tmp.write(code_str)
+        tmp_path = tmp.name
+
+    try:
+        # Pylint
+        pylint_out = subprocess.run(
+            ["pylint", tmp_path, "--disable=all", "--enable=E,W,C,R"], # E: Error, W: Warning, C: Convention, R: Refactor
+            capture_output=True,
+            text=True
+        )
+        results["pylint"] = pylint_out.stdout
+
+        # Flake8
+        flake8_out = subprocess.run(
+            ["flake8", tmp_path],
+            capture_output=True,
+            text=True
+        )
+        results["flake8"] = flake8_out.stdout
+
+        # Bandit
+        bandit_out = subprocess.run(
+            ["bandit", "-r", tmp_path, "-q", "-n", "5"],
+            capture_output=True,
+            text=True
+        )
+        results["bandit"] = bandit_out.stdout
+
+        # MyPy
+        mypy_out = subprocess.run(
+            ["mypy", tmp_path],
+            capture_output=True,
+            text=True
+        )
+        results["mypy"] = mypy_out.stdout
+
+    finally:
+        os.remove(tmp_path)
+
+    # 문자열 형태로 변환
+    str_results = ''
+    for tool, output in results.items():
+        str_results = str_results + f"\n== {tool.upper()} REPORT ==" + '\n' + output.strip() + '\n'
+
+    return str_results

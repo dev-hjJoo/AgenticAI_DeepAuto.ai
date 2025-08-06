@@ -167,11 +167,9 @@ def extract_code_issues(state: CodeReviewState) -> CodeReviewState:
         output = rag_chain.invoke({"code": state['user_code'], 'static_analysis': static_analysis})
 
         # 결과 후처리
-        if output.strip().startswith("```json"):
-            output = output[len('```json'):]
-        if output.strip().endswith("```"):
-            output = output[:-len('```')]
-        result = json.loads(output.strip())
+        result = _remove_markdown_code_tag(output)
+        print('********\nresult:', result)
+        result = json.loads(result)
 
         # Update states
         return {"issues": result['issues'], "pylint_score": result['pylint_score']}
@@ -182,17 +180,13 @@ def extract_code_issues(state: CodeReviewState) -> CodeReviewState:
         print('[LOG][BE] STATIC ANALYSIS:', static_analysis)
 
         output = rag_chain.invoke({"code": state['refactoring_code'], 'static_analysis': static_analysis})
-
+        
         # 결과 후처리
-        if output.strip().startswith("```json"):
-            output = output[len('```json'):]
-        if output.strip().endswith("```"):
-            output = output[:-len('```')]
-        result = json.loads(output.strip())
+        result = _remove_markdown_code_tag(output)
+        result = json.loads(result)
+
         # Update states
         return {"refactoring_issues": result['issues'], "refactoring_pylint_score": result['pylint_score']}
-
-    
 
     
 
@@ -232,13 +226,9 @@ def suggest_code_improvements(state: CodeReviewState) -> CodeReviewState:
         | StrOutputParser()
     )
     output = rag_chain.invoke({"user_code": state['user_code'], 'issues': state['issues']})
-    result = output.strip()
-    if result.startswith("```python"):
-            result = result[len('```python'):]
-    if result.endswith("```"):
-        result = result[:-len('```')]
+    result = _remove_markdown_code_tag(output)
 
-    return {'refactoring_code': result.strip()}
+    return {'refactoring_code': result}
 
 def generate_unit_tests(state: CodeReviewState) -> CodeReviewState:
     template = '''
@@ -284,9 +274,9 @@ def generate_unit_tests(state: CodeReviewState) -> CodeReviewState:
         | StrOutputParser()
     )
     output = rag_chain.invoke({"code": state['refactoring_code']})
+    result = _remove_markdown_code_tag(output)
 
-
-    return {'unit_code': output}
+    return {'unit_code': result}
         
         
 
@@ -296,7 +286,7 @@ def generate_unit_tests(state: CodeReviewState) -> CodeReviewState:
 ====================
 '''
 
-def _analyze_code(code_str: str) -> dict:
+def _analyze_code(code: str) -> dict:
     ''' _analyze_code
         주어진 Python 코드 문자열을 임시 파일에 저장한 후, Pylint, Flake8, Bandit, MyPy를 실행하여 결과 반환
         I: 문자열 형식의 파이썬 코드 (String)
@@ -306,7 +296,7 @@ def _analyze_code(code_str: str) -> dict:
     results = {}
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".py", mode='w') as tmp:
-        tmp.write(code_str)
+        tmp.write(code)
         tmp_path = tmp.name
 
     try:
@@ -351,3 +341,14 @@ def _analyze_code(code_str: str) -> dict:
         str_results = str_results + f"\n== {tool.upper()} REPORT ==" + '\n' + output.strip() + '\n'
 
     return str_results
+
+def _remove_markdown_code_tag(code: str):
+    output = code.strip()
+    if output.startswith("```json"):
+        output = output[len('```json'):]
+    if output.startswith("```python"):
+        output = output[len('```python'):]
+    if output.endswith("```"):
+        output = output[:-len('```')]
+    
+    return output.strip()
